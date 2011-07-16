@@ -6,6 +6,9 @@
  *
  * Virtually type some keys in X11.
  *
+ * http://code.google.com/p/x11type/
+ * http://github.com/ThomasHabets/x11type/
+ *
  */
 /*
  * Copyright 2011 Google Inc.
@@ -88,7 +91,8 @@ usage(int err)
                "\t-V, --version    Show version.\n"
                "\n"
                "Report bugs to: habets@google.com\n"
-               "X11Type home page: <http://code.google.com/p/x11type/>\n"
+               "X11Type Home:   <http://code.google.com/p/x11type/>\n"
+               "X11Type Github: <http://github.com/ThomasHabets/x11type/>\n"
                , argv0.c_str());
         exit(err);
 }
