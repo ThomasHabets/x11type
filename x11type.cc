@@ -131,12 +131,17 @@ Typer::createKeyEvent(Display *display, Window &win,
  *
  */
 void
-Typer::operator()(char ch)
+Typer::operator()(char ch_in)
 {
         Window winRoot = XDefaultRootWindow(display);
         Window winFocus;
         int    revert;
+        int    ch(ch_in);
         XGetInputFocus(display, &winFocus, &revert);
+
+        if (ch == '\n') {
+                ch = XK_Return;
+        }
 
         XKeyEvent event = createKeyEvent(display,
                                          winFocus,
