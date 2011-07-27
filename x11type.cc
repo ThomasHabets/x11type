@@ -44,7 +44,7 @@
 
 BEGIN_NAMESPACE();
 std::string argv0;
-
+int verbose = 0;
 
 /**
  *
@@ -88,6 +88,7 @@ usage(int err)
                "\n"
                "\t-d <display>     Select display. Default to $DISPLAY\n"
                "\t-h, --help       Show this help text\n"
+               "\t-v               Increase verbosity\n"
                "\t-V, --version    Show version.\n"
                "\n"
                "Report bugs to: habets@google.com\n"
@@ -142,7 +143,10 @@ Typer::operator()(char ch_in)
         if (ch == '\n') {
                 ch = XK_Return;
         }
-
+        if (verbose) {
+                fprintf(stderr, "%s: root=0x%x focus=0x%x\n",
+                        argv0.c_str(), winRoot, winFocus);
+        }
         XKeyEvent event = createKeyEvent(display,
                                          winFocus,
                                          winRoot,
@@ -230,13 +234,16 @@ main(int argc, char**argv)
 
         // option parsing
         int opt;
-        while ((opt = getopt(argc, argv, "hd:V")) != -1) {
+        while ((opt = getopt(argc, argv, "hd:vV")) != -1) {
                 switch (opt) {
                 case 'd':
                         display_str = optarg;
                         break;
                 case 'h':
                         usage(EXIT_SUCCESS);
+                        break;
+                case 'v':
+                        verbose++;
                         break;
                 case 'V':
                         printVersion();
