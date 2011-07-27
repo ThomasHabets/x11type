@@ -53,11 +53,11 @@ int verbose = 0;
 class Typer {
         Display *display;
         Window winRoot;
-        Window winFocus;
+        Window window;
 
         XKeyEvent createKeyEvent(bool press, int keycode, int modifiers);
 public:
-        Typer(Display *display);
+        Typer(Display *display, Window window);
         ~Typer();
 
         void operator()(char ch);
@@ -67,17 +67,22 @@ public:
 /**
  *
  */
-Typer::Typer(Display *display)
-        :display(display)
+Typer::Typer(Display *display, Window inwin)
+        :display(display),window(inwin)
 {
-        int revert;
-
         winRoot = XDefaultRootWindow(display);
-        XGetInputFocus(display, &winFocus, &revert);
+        if (!window) {
+                int revert;
+                if (verbose > 1) {
+                        fprintf(stderr, "%s: locating window with focus\n",
+                                argv0.c_str());
+                }
+                XGetInputFocus(display, &window, &revert);
+        }
 
         if (verbose) {
                 fprintf(stderr, "%s: root=0x%x focus=0x%x\n",
-                        argv0.c_str(), winRoot, winFocus);
+                        argv0.c_str(), winRoot, window);
         }
 }
 
@@ -116,12 +121,15 @@ void
 usage(int err)
 {
         printf("x11type %s, by Thomas Habets <habets@google.com>\n"
-               "Usage: %s [ -hV ] [ -d <display> ] [ <text> ]\n"
+               "Usage: %s [ -hvV ] [ -d <display> ] [ -w <win id> ]"
+               " [ <text> ]\n"
                "\n"
                "\t-d <display>     Select display. Default to $DISPLAY\n"
-               "\t-h, --help       Show this help text\n"
-               "\t-v               Increase verbosity\n"
+               "\t-h, --help       Show this help text.\n"
+               "\t-v               Increase verbosity.\n"
                "\t-V, --version    Show version.\n"
+               "\t-w <window id>   Target specific window instead of active"
+               " one.\n"
                "\n"
                "Report bugs to: habets@google.com\n"
                "X11Type Home:   <http://code.google.com/p/x11type/>\n"
@@ -140,7 +148,7 @@ Typer::createKeyEvent(bool press, int keycode, int modifiers)
         XKeyEvent event;
 
         event.display     = display;
-        event.window      = winFocus;
+        event.window      = window;
         event.root        = winRoot;
         event.subwindow   = None;
         event.time        = CurrentTime;
@@ -193,9 +201,9 @@ Typer::operator()(char ch_in)
  *
  */
 void
-typeString(Display *display, const std::string &str)
+typeString(Display *display, Window window, const std::string &str)
 {
-        std::for_each(str.begin(), str.end(), Typer(display));
+        std::for_each(str.begin(), str.end(), Typer(display, window));
 }
 
 
@@ -203,7 +211,7 @@ typeString(Display *display, const std::string &str)
  *
  */
 int
-streamFile(Display *display, int fd)
+streamFile(Display *display, Window window, int fd)
 {
         char buf[1024];
         ssize_t n;
@@ -215,7 +223,8 @@ streamFile(Display *display, int fd)
                         perror("read()");
                         return EXIT_FAILURE;
                 default:
-                        typeString(display, std::string(&buf[0], &buf[n]));
+                        typeString(display, window,
+                                   std::string(&buf[0], &buf[n]));
                 }
         }
 }
@@ -232,6 +241,7 @@ main(int argc, char **argv)
         argv0 = argv[0];
         const char *display_str = NULL;
         const char *str_arg = NULL;
+        Window window = 0;
 
         { // handle GNU options
                 int c;
@@ -248,7 +258,7 @@ main(int argc, char **argv)
 
         // option parsing
         int opt;
-        while ((opt = getopt(argc, argv, "hd:vV")) != -1) {
+        while ((opt = getopt(argc, argv, "hd:vVw:")) != -1) {
                 switch (opt) {
                 case 'd':
                         display_str = optarg;
@@ -261,6 +271,9 @@ main(int argc, char **argv)
                         break;
                 case 'V':
                         printVersion();
+                        break;
+                case 'w':
+                        window = strtoul(optarg, 0, 0);
                         break;
                 default: /* '?' */
                         usage(EXIT_FAILURE);
@@ -278,11 +291,11 @@ main(int argc, char **argv)
         }
         if (str_arg) {
                 // String supplied on command line, use that.
-                typeString(display, str_arg);
+                typeString(display, window, str_arg);
                 return EXIT_SUCCESS;
         } else {
                 // No string on command line, stream all of stdin.
-                return streamFile(display, STDIN_FILENO);
+                return streamFile(display, window, STDIN_FILENO);
         }
         XCloseDisplay(display);
 }
