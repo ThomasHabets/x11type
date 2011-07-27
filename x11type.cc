@@ -18,7 +18,7 @@
  * You may obtain a copy of the License at
  *
  *       http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -46,17 +46,19 @@ BEGIN_NAMESPACE();
 std::string argv0;
 int verbose = 0;
 
+
 /**
- *
+ * std::for_each(str.begin(), str.end(), Typer(display));
  */
 class Typer {
         Display *display;
-public:
-        Typer(Display *display):display(display)  { }
+        Window winRoot;
+        Window winFocus;
 
-        XKeyEvent createKeyEvent(Display *display, Window &win,
-                                 Window &winRoot, bool press,
-                                 int keycode, int modifiers);
+        XKeyEvent createKeyEvent(bool press, int keycode, int modifiers);
+public:
+        Typer(Display *display);
+        ~Typer();
 
         void operator()(char ch);
 };
@@ -65,15 +67,44 @@ public:
 /**
  *
  */
+Typer::Typer(Display *display)
+        :display(display)
+{
+        int revert;
+
+        winRoot = XDefaultRootWindow(display);
+        XGetInputFocus(display, &winFocus, &revert);
+
+        if (verbose) {
+                fprintf(stderr, "%s: root=0x%x focus=0x%x\n",
+                        argv0.c_str(), winRoot, winFocus);
+        }
+}
+
+
+/**
+ *
+ */
+Typer::~Typer()
+{
+        XFlush(display);
+}
+
+
+/**
+ *
+ */
 void
 printVersion()
 {
-        printf("Copyright (C) 2011 Google Inc\n"
+        printf("x11type %s, by Thomas Habets <habets@google.com>\n"
+               "Copyright (C) 2011 Google Inc\n"
                "License GPLv2: GNU GPL version 2 or later "
                "<http://gnu.org/licenses/gpl-2.0.html>\n"
                "This is free software: you are free to change and "
                "redistribute it.\n"
-               "There is NO WARRANTY, to the extent permitted by law.\n");
+               "There is NO WARRANTY, to the extent permitted by law.\n",
+               VERSION);
         exit(EXIT_SUCCESS);
 }
 
@@ -84,7 +115,8 @@ printVersion()
 void
 usage(int err)
 {
-        printf("Usage: %s [ -hV ] [ -d <display> ] [ <text> ]\n"
+        printf("x11type %s, by Thomas Habets <habets@google.com>\n"
+               "Usage: %s [ -hV ] [ -d <display> ] [ <text> ]\n"
                "\n"
                "\t-d <display>     Select display. Default to $DISPLAY\n"
                "\t-h, --help       Show this help text\n"
@@ -94,7 +126,7 @@ usage(int err)
                "Report bugs to: habets@google.com\n"
                "X11Type Home:   <http://code.google.com/p/x11type/>\n"
                "X11Type Github: <http://github.com/ThomasHabets/x11type/>\n"
-               , argv0.c_str());
+               , VERSION, argv0.c_str());
         exit(err);
 }
 
@@ -103,14 +135,12 @@ usage(int err)
  *
  */
 XKeyEvent
-Typer::createKeyEvent(Display *display, Window &win,
-                      Window &winRoot, bool press,
-                      int keycode, int modifiers)
+Typer::createKeyEvent(bool press, int keycode, int modifiers)
 {
         XKeyEvent event;
 
         event.display     = display;
-        event.window      = win;
+        event.window      = winFocus;
         event.root        = winRoot;
         event.subwindow   = None;
         event.time        = CurrentTime;
@@ -134,25 +164,16 @@ Typer::createKeyEvent(Display *display, Window &win,
 void
 Typer::operator()(char ch_in)
 {
-        Window winRoot = XDefaultRootWindow(display);
-        Window winFocus;
-        int    revert;
-        int    ch(ch_in);
-        XGetInputFocus(display, &winFocus, &revert);
+        int ch(ch_in);
 
+        if (verbose > 1) {
+                fprintf(stderr, "%s: typing char <%c>\n",
+                        argv0.c_str(), ch);
+        }
         if (ch == '\n') {
                 ch = XK_Return;
         }
-        if (verbose) {
-                fprintf(stderr, "%s: root=0x%x focus=0x%x\n",
-                        argv0.c_str(), winRoot, winFocus);
-        }
-        XKeyEvent event = createKeyEvent(display,
-                                         winFocus,
-                                         winRoot,
-                                         true,
-                                         ch,
-                                         0);
+        XKeyEvent event = createKeyEvent(true, ch, 0);
         XSendEvent(event.display,
                    event.window,
                    True,
@@ -161,12 +182,7 @@ Typer::operator()(char ch_in)
                 
                 
         // Send a fake key release event to the window.
-        event = createKeyEvent(display,
-                               winFocus,
-                               winRoot,
-                               false,
-                               ch,
-                               0);
+        event = createKeyEvent(false, ch, 0);
         XSendEvent(event.display,
                    event.window,
                    True,
@@ -182,8 +198,8 @@ void
 typeString(Display *display, const std::string &str)
 {
         std::for_each(str.begin(), str.end(), Typer(display));
-        XFlush(display);
 }
+
 
 /**
  *
@@ -213,13 +229,13 @@ END_NAMESPACE();
  *
  */
 int
-main(int argc, char**argv)
+main(int argc, char **argv)
 {
         argv0 = argv[0];
         const char *display_str = NULL;
         const char *str_arg = NULL;
 
-        { /* handle GNU options */
+        { // handle GNU options
                 int c;
                 for (c = 1; c < argc; c++) {
                         if (!strcmp(argv[c], "--")) {
