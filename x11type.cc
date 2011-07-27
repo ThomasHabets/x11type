@@ -167,8 +167,7 @@ Typer::operator()(char ch_in)
         int ch(ch_in);
 
         if (verbose > 1) {
-                fprintf(stderr, "%s: typing char <%c>\n",
-                        argv0.c_str(), ch);
+                fprintf(stderr, "%s: typing char <%c>\n", argv0.c_str(), ch);
         }
         if (ch == '\n') {
                 ch = XK_Return;
@@ -179,8 +178,7 @@ Typer::operator()(char ch_in)
                    True,
                    KeyPressMask,
                    (XEvent *)&event);
-                
-                
+
         // Send a fake key release event to the window.
         event = createKeyEvent(false, ch, 0);
         XSendEvent(event.display,
@@ -272,7 +270,12 @@ main(int argc, char **argv)
                 str_arg = argv[optind];
         }
 
-        Display *display = XOpenDisplay(display_str);
+        Display *display(XOpenDisplay(display_str));
+        if (!display) {
+                fprintf(stderr, "%s: Can't open display: %s\n",
+                        argv0.c_str(), display_str ? display_str : "null");
+                return EXIT_FAILURE;
+        }
         if (str_arg) {
                 // String supplied on command line, use that.
                 typeString(display, str_arg);
@@ -281,4 +284,5 @@ main(int argc, char **argv)
                 // No string on command line, stream all of stdin.
                 return streamFile(display, STDIN_FILENO);
         }
+        XCloseDisplay(display);
 }
